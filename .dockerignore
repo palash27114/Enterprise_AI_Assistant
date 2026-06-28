@@ -1,0 +1,49 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv
+venv
+ENV
+env
+*.egg-info
+.installed.cfg
+*.egg
+dist
+build
+
+# Environment & secrets
+.env
+.env.local
+.env.*.local
+
+# IDE & OS
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Logs & test artifacts
+*.log
+.pytest_cache
+.coverage
+htmlcov
+
+# Docker
+docker-compose*.yml
+Dockerfile*
+
+# Docs (not needed in image)
+README.md
+
+# Runtime data (mounted as volume in production)
+data/tickets.json
+data/conversations.json
