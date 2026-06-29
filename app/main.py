@@ -4,10 +4,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, status
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.router import api_router
+from app.core.config import CORS_ORIGINS
 from app.core.logging import setup_logging
 from app.db.session import init_db
 from app.models.openapi import OPENAPI_DESCRIPTION, OPENAPI_TAGS
@@ -38,6 +40,14 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+    )
+
+    application.add_middleware(
+        CORSMiddleware,
+        allow_origins=CORS_ORIGINS,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
     )
 
     @application.exception_handler(RequestValidationError)

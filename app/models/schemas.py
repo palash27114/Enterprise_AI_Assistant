@@ -1,8 +1,20 @@
 """Pydantic models for request and response validation."""
 
-from typing import Literal, Optional
+from typing import Any, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+
+ActionType = Literal[
+    "ai_response",
+    "create_ticket",
+    "generate_report",
+    "fetch_employee",
+    "fetch_customer",
+    "get_profile",
+    "query_data",
+    "trigger_workflow",
+    "error",
+]
 
 
 class AskRequest(BaseModel):
@@ -14,6 +26,10 @@ class AskRequest(BaseModel):
         min_length=1,
         max_length=1000,
         examples=["What is the leave policy?"],
+    )
+    agent: Optional[Literal["openai", "gemini"]] = Field(
+        default=None,
+        description="Optional AI agent: `openai` or `gemini`. Uses server default if omitted.",
     )
 
     model_config = ConfigDict(
@@ -47,11 +63,11 @@ class AskResponse(BaseModel):
         ...,
         description="Assistant reply, ticket confirmation, or error fallback message.",
     )
-    action: Literal["ai_response", "create_ticket", "error"] = Field(
+    action: ActionType = Field(
         ...,
         description=(
-            "Outcome of the request: `ai_response` for LLM answers, "
-            "`create_ticket` for support tickets, `error` when the LLM is unavailable."
+            "Outcome of the request: `ai_response`, `create_ticket`, `generate_report`, "
+            "`fetch_employee`, `fetch_customer`, `query_data`, `trigger_workflow`, or `error`."
         ),
     )
     ticket_id: Optional[str] = Field(
@@ -71,6 +87,15 @@ class AskResponse(BaseModel):
         default=None,
         description="Ticket status. Present only when action is `create_ticket`.",
         examples=["Open"],
+    )
+    agent: Optional[str] = Field(
+        default=None,
+        description="AI agent used for the response (`openai` or `gemini`).",
+        examples=["openai"],
+    )
+    data: Optional[dict[str, Any]] = Field(
+        default=None,
+        description="Structured action payload for reports, lookups, queries, and workflows.",
     )
 
     model_config = ConfigDict(
@@ -143,3 +168,94 @@ class ValidationErrorResponse(BaseModel):
             ],
         },
     )
+
+
+class RegisterRequest(BaseModel):
+    """Payload for email/password registration."""
+
+    email: str = Field(..., examples=["user@company.com"])
+    password: str = Field(..., min_length=8, max_length=128)
+    full_name: str = Field(..., min_length=2, max_length=255, examples=["Palash Joshi"])
+
+
+class LoginRequest(BaseModel):
+    """Payload for email/password login."""
+
+    email: str = Field(..., examples=["user@company.com"])
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class RefreshRequest(BaseModel):
+    """Payload for refresh token rotation."""
+
+    refresh_token: str
+
+
+class LogoutRequest(BaseModel):
+    """Payload for logout."""
+
+    refresh_token: str
+
+
+class UserResponse(BaseModel):
+    """Authenticated user profile."""
+
+    id: str
+    email: str
+    full_name: str
+    provider: str
+
+
+class TokenResponse(BaseModel):
+    """Access and refresh token pair."""
+
+    access_token: str
+    refresh_token: str
+    token_type: str = "bearer"
+    expires_in: int
+    user: UserResponse
+
+
+class AgentInfo(BaseModel):
+    """Configured AI agent."""
+
+    id: str
+    name: str
+    model: str
+    available: bool
+    is_default: bool
+    healthy: bool = False
+
+
+class AgentListResponse(BaseModel):
+    """Available AI agents."""
+
+    default_agent: str
+    agents: list[AgentInfo]
+
+
+class ConversationMessage(BaseModel):
+    """A single stored message."""
+
+    role: str
+    content: str
+
+
+class ConversationSummary(BaseModel):
+    """Conversation list item."""
+
+    conversation_id: str
+    title: str
+    preview: str
+    message_count: int
+    updated_at: str
+
+
+class ConversationDetailResponse(BaseModel):
+    """Full conversation with messages."""
+
+    conversation_id: str
+    title: str
+    updated_at: str
+    messages: list[ConversationMessage]
+

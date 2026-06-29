@@ -1,17 +1,19 @@
-.PHONY: help install dev run docker-build docker-up docker-down docker-dev docker-logs docker-ps health
+.PHONY: help install dev run frontend-install frontend-dev docker-build docker-up docker-down docker-dev docker-logs docker-ps health
 
 help:
 	@echo "Enterprise AI Assistant — available commands:"
-	@echo "  make install      Install Python dependencies locally"
-	@echo "  make dev          Run API locally with hot reload"
-	@echo "  make run          Run API locally (production mode, multi-worker)"
-	@echo "  make docker-build Build production Docker images"
-	@echo "  make docker-up    Start production stack (api + nginx)"
-	@echo "  make docker-dev   Start development API container with hot reload"
-	@echo "  make docker-down  Stop all Docker containers"
-	@echo "  make docker-logs  Tail container logs"
-	@echo "  make docker-ps    Show running containers"
-	@echo "  make health       Hit the health endpoint"
+	@echo "  make install          Install Python dependencies locally"
+	@echo "  make dev              Run API locally with hot reload"
+	@echo "  make run              Run API locally (production mode, multi-worker)"
+	@echo "  make frontend-install Install frontend dependencies"
+	@echo "  make frontend-dev     Run frontend locally (Vite dev server)"
+	@echo "  make docker-build     Build production Docker images"
+	@echo "  make docker-up        Start production stack (frontend + api + nginx + postgres)"
+	@echo "  make docker-dev       Start development stack with hot reload"
+	@echo "  make docker-down      Stop all Docker containers"
+	@echo "  make docker-logs      Tail container logs"
+	@echo "  make docker-ps        Show running containers"
+	@echo "  make health           Hit the health endpoint"
 
 install:
 	pip install -r requirements.txt
@@ -21,6 +23,12 @@ dev:
 
 run:
 	uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 2
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
 
 docker-build:
 	docker compose build

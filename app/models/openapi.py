@@ -4,10 +4,21 @@ from app.models.schemas import HealthResponse, ValidationErrorResponse
 
 OPENAPI_TAGS = [
     {
+        "name": "Auth",
+        "description": "Registration, login, OAuth, and token refresh endpoints.",
+    },
+    {
+        "name": "Enterprise",
+        "description": (
+            "Enterprise action APIs used by the AI chatbot and external clients. "
+            "Includes profile, tickets, reports, employee/customer lookup, queries, and workflows."
+        ),
+    },
+    {
         "name": "Assistant",
         "description": (
             "Primary AI assistant endpoints. Submit questions for HR, IT, and policy "
-            "answers, or automatically create support tickets when incident keywords are detected."
+            "answers, execute simulated enterprise actions, or create support tickets."
         ),
     },
     {
@@ -26,8 +37,21 @@ and automatically creates support tickets for incident-related requests.
 
 1. **Validate** — Questions must be non-empty and at most 1000 characters.
 2. **Remember** — Conversation history is stored and included in LLM prompts.
-3. **Route** — Keyword detection decides between AI Q&A and ticket creation.
-4. **Respond** — A structured JSON payload is returned with `action` and `conversation_id`.
+3. **Route** — Intent detection decides between AI Q&A and enterprise actions.
+4. **Respond** — A structured JSON payload is returned with `action`, optional `data`, and `conversation_id`.
+
+### Supported actions (simulated with mock data)
+
+| Action | Example prompt |
+|--------|----------------|
+| `create_ticket` | "My laptop won't start, create a ticket" |
+| `generate_report` | "Generate an HR headcount report" |
+| `fetch_employee` | "Fetch employee info for Palash Joshi" |
+| `fetch_customer` | "Get customer details for Acme Corporation" |
+| `get_profile` | "Show my profile" |
+| `query_data` | "Query the employees table" |
+| `trigger_workflow` | "Trigger employee onboarding workflow" |
+| `ai_response` | General HR/IT/policy questions |
 
 ### Conversation continuity
 
@@ -43,6 +67,21 @@ A support ticket is created when the question contains any of:
 
 Configure via environment variables: **OpenAI** (default) or **Google Gemini**.
 See the project README for setup details.
+
+### Enterprise REST APIs (Swagger)
+
+The chatbot routes detected intents to the same handlers as these endpoints:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/profile` | Authenticated user profile |
+| POST | `/tickets` | Create support ticket |
+| POST | `/reports/generate` | Generate mock report |
+| GET | `/employees`, `/employees/{id}` | Employee directory |
+| GET | `/customers`, `/customers/{id}` | Customer accounts |
+| POST | `/queries` | Query mock DB/file |
+| GET | `/workflows` | List workflows |
+| POST | `/workflows/trigger` | Trigger workflow |
 """
 
 ASK_RESPONSES = {

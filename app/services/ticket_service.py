@@ -27,13 +27,14 @@ def _next_ticket_id(session) -> str:
     return f"INC-{max_number + 1}"
 
 
-def create_ticket(issue: str) -> dict[str, Any]:
+def create_ticket(issue: str, user_id: str | None = None) -> dict[str, Any]:
     """Create a new support ticket and persist it."""
     with get_session() as session:
         ticket = Ticket(
             id=_next_ticket_id(session),
             issue=issue,
             status="Open",
+            user_id=user_id,
             created_at=datetime.now(timezone.utc),
         )
         session.add(ticket)

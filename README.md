@@ -30,29 +30,25 @@ The application is modular, containerized, and designed for both local developme
 - **Graceful error handling** — LLM failures never crash the API
 - **Structured logging** — Request, intent, ticket, LLM, and error events
 - **Auto-generated API docs** — Available at `/docs` and `/redoc`
-- **Docker production stack** — API + nginx reverse proxy with health checks
+- **Web chat UI** — React frontend for asking questions and creating tickets
+- **Authentication** — Email/password, Google OAuth, GitHub OAuth with JWT + refresh tokens
+- **Protected AI chat** — Only logged-in users can call `POST /ask`
+- **Docker production stack** — Frontend + API + nginx + PostgreSQL
 
 ---
 
 ## Architecture
 
 ```
-Client
+Browser (React UI)
     │
 nginx (port 80)
-    │
-FastAPI API (port 8000)
-    │
-Request Validation (app/models/)
-    │
-Conversation Memory (app/services/memory_service.py)
-    │
-Intent Router (app/services/intent.py)
- ┌───────────────┐
- │               │
-LLM Service   Ticket Service
- │               │
- └──────Response─┘
+ ┌────────┴────────┐
+ │                 │
+Frontend        FastAPI API
+(static)        (port 8000)
+                     │
+              PostgreSQL
 ```
 
 ### Docker services
@@ -61,7 +57,8 @@ LLM Service   Ticket Service
 |---------|------|
 | `postgres` | PostgreSQL 16 database for tickets and conversations |
 | `api` | FastAPI application (multi-worker uvicorn) |
-| `nginx` | Reverse proxy, load balancing, production entry point |
+| `frontend` | React chat UI (static build served by nginx) |
+| `nginx` | Reverse proxy and public entry point |
 
 ---
 
@@ -101,6 +98,15 @@ enterprise-ai-assistant/
 │   │   └── nginx.conf            # Proxy configuration
 │   └── postgres/
 │       └── init.sql              # Database schema
+│   └── frontend/
+│       └── Dockerfile            # Frontend production image
+│
+├── frontend/                     # React chat UI (Vite + TypeScript)
+│   ├── src/
+│   │   ├── App.tsx
+│   │   ├── api/client.ts
+│   │   └── components/
+│   └── package.json
 │
 ├── main.py                       # Uvicorn entry point
 ├── docker-compose.yml            # Production stack
@@ -139,21 +145,22 @@ cp .env.example .env
 
 ## Running Locally
 
+**Terminal 1 — API:**
 ```bash
-# Development (hot reload)
 make dev
-# or
-uvicorn app.main:app --reload
-
-# Production mode (multi-worker)
-make run
 ```
 
-The API will be available at:
+**Terminal 2 — Frontend:**
+```bash
+make frontend-install
+make frontend-dev
+```
 
-- **API base:** http://127.0.0.1:8000
-- **Swagger UI:** http://127.0.0.1:8000/docs
-- **ReDoc:** http://127.0.0.1:8000/redoc
+| App | URL |
+|-----|-----|
+| **Chat UI** | http://127.0.0.1:5173 |
+| **Swagger UI** | http://127.0.0.1:8000/docs |
+| **API** | http://127.0.0.1:8000 |
 
 ---
 
@@ -179,8 +186,8 @@ Production endpoints:
 
 | URL | Description |
 |-----|-------------|
-| http://localhost/health | Health check (via nginx) |
-| http://localhost/ask | Main API endpoint |
+| http://localhost/ | **Chat UI (main app)** |
+| http://localhost/health | Health check |
 | http://localhost/docs | Swagger UI |
 
 ### Development with Docker (hot reload)
@@ -191,7 +198,8 @@ make docker-dev
 docker compose -f docker-compose.dev.yml up --build
 ```
 
-API available at http://localhost:8000
+API available at http://localhost:8000  
+Frontend available at http://localhost:5173
 
 ### Other Docker commands
 
@@ -220,6 +228,15 @@ make health          # Ping health endpoint
 | `POSTGRES_HOST` | No | `localhost` | PostgreSQL host |
 | `POSTGRES_PORT` | No | `5432` | PostgreSQL port |
 | `DATABASE_URL` | No | built from above | Full PostgreSQL connection URL |
+| `JWT_SECRET_KEY` | Yes (prod) | — | Secret for signing access tokens |
+| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | No | `30` | Access token lifetime |
+| `JWT_REFRESH_TOKEN_EXPIRE_DAYS` | No | `7` | Refresh token lifetime |
+| `GOOGLE_CLIENT_ID` | For Google login | — | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | For Google login | — | Google OAuth client secret |
+| `GITHUB_CLIENT_ID` | For GitHub login | — | GitHub OAuth client ID |
+| `GITHUB_CLIENT_SECRET` | For GitHub login | — | GitHub OAuth client secret |
+| `FRONTEND_URL` | No | `http://localhost:5173` | Frontend URL for OAuth redirects |
+| `BACKEND_URL` | No | `http://localhost:8000` | Backend URL for OAuth callbacks |
 | `APP_WORKERS` | No | `2` | Uvicorn worker processes |
 | `LOG_LEVEL` | No | `INFO` | Logging level |
 | `NGINX_PORT` | No | `80` | Host port for nginx |
@@ -230,8 +247,13 @@ make health          # Ping health endpoint
 ## API Example
 
 ```bash
+curl -X POST http://localhost/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@company.com","password":"yourpassword"}'
+
 curl -X POST http://localhost/ask \
   -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <access_token>" \
   -d '{"question": "What is the leave policy?"}'
 ```
 

@@ -43,6 +43,10 @@ Thumbs.db
 # Logs
 *.log
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+
 # Local data overrides (keep structure, ignore runtime changes if desired)
 # data/tickets.json
 # data/conversations.json
