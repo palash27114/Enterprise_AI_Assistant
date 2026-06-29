@@ -15,6 +15,7 @@ import { Header } from "./components/Header";
 import { WelcomeBanner } from "./components/WelcomeBanner";
 import { useAuth } from "./context/AuthContext";
 import { LoginPage } from "./pages/LoginPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { AgentId, AgentInfo, ApiError, ChatMessage, ConversationSummary } from "./types";
 
@@ -241,6 +242,8 @@ function ChatApp() {
       <Header
         isOnline={isOnline}
         userName={user?.full_name ?? user?.email ?? "User"}
+        userRole={user?.job_title ?? user?.access_role_label ?? "Workspace member"}
+        userProvider={user?.provider ?? "local"}
         agents={agents}
         selectedAgent={selectedAgent}
         agentsReady={agentsReady}
@@ -291,6 +294,10 @@ export default function App() {
 
   if (window.location.pathname === "/oauth/callback") {
     return <AuthCallbackPage />;
+  }
+
+  if (window.location.pathname === "/reset-password") {
+    return <ResetPasswordPage />;
   }
 
   if (isLoading) {

@@ -1,4 +1,4 @@
-import { AgentId, AgentListResponse, ApiError, AskResponse, AuthTokens, AuthUser, ConversationDetail, ConversationSummary } from "../types";
+import { AgentId, AgentListResponse, ApiError, AskResponse, AuthTokens, AuthUser, ConversationDetail, ConversationSummary, TicketRecord } from "../types";
 import {
   clearSession,
   isSessionExpired,
@@ -154,6 +154,69 @@ export async function fetchConversation(conversationId: string): Promise<Convers
     throw new ApiError(await parseError(response));
   }
   return (await response.json()) as ConversationDetail;
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const response = await authFetch(`${API_BASE}/auth/change-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseError(response));
+  }
+}
+
+export interface ForgotPasswordResult {
+  message: string;
+  reset_url?: string | null;
+}
+
+export async function forgotPassword(email: string): Promise<ForgotPasswordResult> {
+  const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseError(response));
+  }
+
+  return (await response.json()) as ForgotPasswordResult;
+}
+
+export async function resetPassword(token: string, newPassword: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password: newPassword }),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseError(response));
+  }
+}
+
+export async function updateTicket(
+  ticketId: string,
+  updates: { issue?: string; status?: string; priority?: string },
+): Promise<TicketRecord> {
+  const response = await authFetch(`${API_BASE}/tickets/${ticketId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(updates),
+  });
+
+  if (!response.ok) {
+    throw new ApiError(await parseError(response));
+  }
+
+  return (await response.json()) as TicketRecord;
 }
 
 export async function fetchAgents(): Promise<AgentListResponse> {

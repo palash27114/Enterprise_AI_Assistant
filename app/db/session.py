@@ -10,7 +10,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import DATABASE_URL
-from app.db.models import Base
+from app.db.migrations import run_migrations
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +33,11 @@ def get_session() -> Generator[Session, None, None]:
 
 
 def init_db(max_retries: int = 10, retry_delay: float = 3.0) -> None:
-    """Create tables and verify database connectivity with retries."""
+    """Run Liquibase-compatible migrations and verify database connectivity."""
+    run_migrations(engine, max_retries=max_retries, retry_delay=retry_delay)
+
     for attempt in range(1, max_retries + 1):
         try:
-            Base.metadata.create_all(bind=engine)
             with get_session() as session:
                 session.execute(text("SELECT 1"))
             logger.info("Database initialized successfully")

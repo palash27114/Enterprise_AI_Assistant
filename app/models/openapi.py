@@ -1,6 +1,6 @@
 """OpenAPI / Swagger metadata and tag definitions."""
 
-from app.models.schemas import HealthResponse, ValidationErrorResponse
+from app.models.schemas import ValidationErrorResponse
 
 OPENAPI_TAGS = [
     {
@@ -22,67 +22,16 @@ OPENAPI_TAGS = [
         ),
     },
     {
+        "name": "Conversations",
+        "description": "Per-user chat history — list and load past conversations.",
+    },
+    {
         "name": "Health",
         "description": "Service health and readiness checks.",
     },
 ]
 
-OPENAPI_DESCRIPTION = """
-## Enterprise AI Assistant API
-
-REST API for an enterprise assistant that answers HR, IT, and company policy questions
-and automatically creates support tickets for incident-related requests.
-
-### How it works
-
-1. **Validate** — Questions must be non-empty and at most 1000 characters.
-2. **Remember** — Conversation history is stored and included in LLM prompts.
-3. **Route** — Intent detection decides between AI Q&A and enterprise actions.
-4. **Respond** — A structured JSON payload is returned with `action`, optional `data`, and `conversation_id`.
-
-### Supported actions (simulated with mock data)
-
-| Action | Example prompt |
-|--------|----------------|
-| `create_ticket` | "My laptop won't start, create a ticket" |
-| `generate_report` | "Generate an HR headcount report" |
-| `fetch_employee` | "Fetch employee info for Palash Joshi" |
-| `fetch_customer` | "Get customer details for Acme Corporation" |
-| `get_profile` | "Show my profile" |
-| `query_data` | "Query the employees table" |
-| `trigger_workflow` | "Trigger employee onboarding workflow" |
-| `ai_response` | General HR/IT/policy questions |
-
-### Conversation continuity
-
-Each response includes a `conversation_id`. To continue a multi-turn conversation,
-pass it back in the **`X-Conversation-Id`** request header on the next call to `POST /ask`.
-
-### Ticket keywords
-
-A support ticket is created when the question contains any of:
-`ticket`, `issue`, `problem`, `incident`, `laptop`, `outlook`, `vpn`, `access`, `login`.
-
-### LLM providers
-
-Configure via environment variables: **OpenAI** (default) or **Google Gemini**.
-See the project README for setup details.
-
-### Enterprise REST APIs (Swagger)
-
-The chatbot routes detected intents to the same handlers as these endpoints:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET | `/profile` | Authenticated user profile |
-| POST | `/tickets` | Create support ticket |
-| POST | `/reports/generate` | Generate mock report |
-| GET | `/employees`, `/employees/{id}` | Employee directory |
-| GET | `/customers`, `/customers/{id}` | Customer accounts |
-| POST | `/queries` | Query mock DB/file |
-| GET | `/workflows` | List workflows |
-| POST | `/workflows/trigger` | Trigger workflow |
-"""
+OPENAPI_DESCRIPTION = "Enterprise AI Assistant API"
 
 ASK_RESPONSES = {
     200: {
@@ -150,9 +99,18 @@ ASK_RESPONSES = {
 HEALTH_RESPONSES = {
     200: {
         "description": "Service and database are healthy.",
+        "content": {
+            "application/json": {
+                "example": {"status": "ok", "database": "ok"},
+            },
+        },
     },
     503: {
         "description": "Service is running but the database is unavailable.",
-        "model": HealthResponse,
+        "content": {
+            "application/json": {
+                "example": {"status": "degraded", "database": "unavailable"},
+            },
+        },
     },
 }

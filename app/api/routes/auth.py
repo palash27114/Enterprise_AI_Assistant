@@ -9,10 +9,14 @@ from fastapi.responses import RedirectResponse
 from app.api.dependencies import get_current_user
 from app.core.config import FRONTEND_URL
 from app.models.schemas import (
+    ChangePasswordRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
     LoginRequest,
     LogoutRequest,
     RefreshRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
     UserResponse,
 )
@@ -85,12 +89,52 @@ async def logout(payload: LogoutRequest) -> dict[str, str]:
 )
 async def me(current_user=Depends(get_current_user)) -> UserResponse:
     """Return the authenticated user's profile."""
-    return UserResponse(
-        id=current_user.id,
-        email=current_user.email,
-        full_name=current_user.full_name,
-        provider=current_user.provider,
-    )
+    profile = auth_service.get_user_profile(current_user.id)
+    return UserResponse(**profile)
+
+
+@router.post(
+    "/change-password",
+    summary="Change account password",
+)
+async def change_password(
+    payload: ChangePasswordRequest,
+    current_user=Depends(get_current_user),
+) -> dict[str, str]:
+    """Change password for a local email/password account."""
+    try:
+        auth_service.change_password(
+            current_user.id,
+            payload.current_password,
+            payload.new_password,
+        )
+        return {"message": "Password updated successfully."}
+    except auth_service.AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.post(
+    "/forgot-password",
+    response_model=ForgotPasswordResponse,
+    summary="Request a password reset link",
+)
+async def forgot_password(payload: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    """Send password reset instructions for local email/password accounts."""
+    result = auth_service.request_password_reset(payload.email)
+    return ForgotPasswordResponse(**result)
+
+
+@router.post(
+    "/reset-password",
+    summary="Reset password with a one-time token",
+)
+async def reset_password(payload: ResetPasswordRequest) -> dict[str, str]:
+    """Set a new password using the token from the reset email link."""
+    try:
+        auth_service.reset_password_with_token(payload.token, payload.new_password)
+        return {"message": "Password reset successfully. You can sign in with your new password."}
+    except auth_service.AuthError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
 @router.get("/google/login", summary="Start Google OAuth login")

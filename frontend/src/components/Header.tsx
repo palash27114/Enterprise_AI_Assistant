@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { AgentId, AgentInfo } from "../types";
+import { AccountModal } from "./AccountModal";
 
 const SWAGGER_URL = `${import.meta.env.VITE_API_URL ?? ""}/docs`;
 
 interface HeaderProps {
   isOnline: boolean;
   userName: string;
+  userRole: string;
+  userProvider: string;
   agents: AgentInfo[];
   selectedAgent: AgentId;
   agentsReady: boolean;
@@ -15,12 +19,15 @@ interface HeaderProps {
 export function Header({
   isOnline,
   userName,
+  userRole,
+  userProvider,
   agents,
   selectedAgent,
   agentsReady,
   onAgentChange,
   onLogout,
 }: HeaderProps) {
+  const [accountOpen, setAccountOpen] = useState(false);
   const selectedInfo = agents.find((agent) => agent.id === selectedAgent);
   const initials = userName
     .split(" ")
@@ -30,78 +37,89 @@ export function Header({
     .toUpperCase();
 
   return (
-    <header className="app-header">
-      <div className="header-main">
-        <div className="brand">
-          <div className="brand-icon" aria-hidden="true">
-            EA
-          </div>
-          <div>
-            <p className="brand-eyebrow">Enterprise Platform</p>
-            <h1>AI Assistant</h1>
-          </div>
-        </div>
-
-        <div className="header-toolbar">
-          <div className="toolbar-group agent-group">
-            <span className="toolbar-label">AI Agent</span>
-            <div className="agent-switch" role="group" aria-label="Select AI agent">
-              {agents.map((agent) => {
-                const disabled = !agent.available || !agentsReady;
-                const isActive = selectedAgent === agent.id;
-
-                return (
-                  <button
-                    key={agent.id}
-                    type="button"
-                    className={`agent-option ${isActive ? "active" : ""}`}
-                    disabled={disabled}
-                    onClick={() => onAgentChange(agent.id)}
-                    title={
-                      !agent.available
-                        ? "Not configured"
-                        : agent.healthy
-                          ? `${agent.name} · ${agent.model}`
-                          : `${agent.name} unavailable — check API quota or billing`
-                    }
-                  >
-                    <span className="agent-option-name">{agent.name}</span>
-                    {agent.available && (
-                      <span className={`agent-status-dot ${agent.healthy ? "healthy" : "unhealthy"}`} />
-                    )}
-                  </button>
-                );
-              })}
+    <>
+      <header className="app-header">
+        <div className="header-main">
+          <div className="brand">
+            <div className="brand-icon" aria-hidden="true">
+              EA
             </div>
-            {selectedInfo && (
-              <span className="model-tag">{selectedInfo.model}</span>
-            )}
+            <div>
+              <p className="brand-eyebrow">Enterprise Platform</p>
+              <h1>AI Assistant</h1>
+            </div>
           </div>
 
-          <div className="toolbar-group">
-            <span className={`status-pill ${isOnline ? "online" : "offline"}`}>
-              <span className="status-dot" />
-              {isOnline ? "Connected" : "Offline"}
-            </span>
-            <a href={SWAGGER_URL} target="_blank" rel="noreferrer" className="ghost-button link-button">
-              Swagger
-            </a>
-          </div>
-        </div>
-      </div>
+          <div className="header-toolbar">
+            <div className="toolbar-group agent-group">
+              <span className="toolbar-label">AI Agent</span>
+              <div className="agent-switch" role="group" aria-label="Select AI agent">
+                {agents.map((agent) => {
+                  const disabled = !agent.available || !agentsReady;
+                  const isActive = selectedAgent === agent.id;
 
-      <div className="header-user">
-        <div className="user-chip">
-          <span className="user-avatar">{initials}</span>
-          <div>
-            <p className="user-name">{userName}</p>
-            <p className="user-role">Workspace member</p>
+                  return (
+                    <button
+                      key={agent.id}
+                      type="button"
+                      className={`agent-option ${isActive ? "active" : ""}`}
+                      disabled={disabled}
+                      onClick={() => onAgentChange(agent.id)}
+                      title={
+                        !agent.available
+                          ? "Not configured"
+                          : agent.healthy
+                            ? `${agent.name} · ${agent.model}`
+                            : `${agent.name} unavailable — check API quota or billing`
+                      }
+                    >
+                      <span className="agent-option-name">{agent.name}</span>
+                      {agent.available && (
+                        <span className={`agent-status-dot ${agent.healthy ? "healthy" : "unhealthy"}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedInfo && <span className="model-tag">{selectedInfo.model}</span>}
+            </div>
+
+            <div className="toolbar-group">
+              <span className={`status-pill ${isOnline ? "online" : "offline"}`}>
+                <span className="status-dot" />
+                {isOnline ? "Connected" : "Offline"}
+              </span>
+              <a href={SWAGGER_URL} target="_blank" rel="noreferrer" className="ghost-button link-button">
+                Swagger
+              </a>
+            </div>
           </div>
         </div>
-        <button type="button" className="logout-button" onClick={onLogout}>
-          Sign out
-        </button>
-      </div>
-    </header>
+
+        <div className="header-user">
+          <div className="user-chip">
+            <span className="user-avatar">{initials}</span>
+            <div>
+              <p className="user-name">{userName}</p>
+              <p className="user-role">{userRole}</p>
+            </div>
+          </div>
+          <div className="header-user-actions">
+            <button type="button" className="ghost-button" onClick={() => setAccountOpen(true)}>
+              Account
+            </button>
+            <button type="button" className="logout-button" onClick={onLogout}>
+              Sign out
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <AccountModal
+        isOpen={accountOpen}
+        canChangePassword={userProvider === "local"}
+        onClose={() => setAccountOpen(false)}
+      />
+    </>
   );
 }

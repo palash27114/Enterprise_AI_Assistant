@@ -15,21 +15,34 @@ WorkflowKey = Literal[
 QuerySourceType = Literal["database", "file"]
 
 
+TicketStatus = Literal["Open", "In Progress", "Resolved", "Closed"]
+TicketPriority = Literal["Low", "Medium", "High"]
+
+
 class CreateTicketRequest(BaseModel):
     """Payload for POST /tickets."""
 
     issue: str = Field(..., min_length=1, max_length=1000, examples=["VPN login fails every morning"])
-    priority: Optional[str] = Field(default="Medium", examples=["High"])
+    priority: TicketPriority = Field(default="Medium", examples=["High"])
+
+
+class UpdateTicketRequest(BaseModel):
+    """Payload for PATCH /tickets/{ticket_id}."""
+
+    issue: Optional[str] = Field(default=None, min_length=1, max_length=1000, examples=["Updated issue description"])
+    status: Optional[TicketStatus] = Field(default=None, examples=["In Progress"])
+    priority: Optional[TicketPriority] = Field(default=None, examples=["High"])
 
 
 class TicketResponse(BaseModel):
     """Support ticket record."""
 
-    id: str
-    issue: str
-    status: str
-    created_at: str
-    priority: Optional[str] = None
+    id: str = Field(examples=["INC-1001"])
+    issue: str = Field(examples=["VPN login fails every morning"])
+    status: str = Field(examples=["Open"])
+    created_at: str = Field(examples=["2026-06-29T10:00:00+00:00"])
+    updated_at: Optional[str] = Field(default=None, examples=["2026-06-29T11:30:00+00:00"])
+    priority: Optional[str] = Field(default="Medium", examples=["High"])
 
 
 class GenerateReportRequest(BaseModel):
@@ -55,15 +68,17 @@ class ReportResponse(BaseModel):
 class EmployeeResponse(BaseModel):
     """Employee directory record."""
 
-    employee_id: str
-    name: str
-    department: str
-    role: str
-    email: str
-    location: str
-    manager: str
-    start_date: str
-    status: str
+    employee_id: str = Field(examples=["EMP-1001"])
+    name: str = Field(examples=["Palash Joshi"])
+    department: str = Field(examples=["Engineering"])
+    role: str = Field(examples=["Senior Software Engineer"])
+    email: str = Field(examples=["palash.joshi@company.com"])
+    location: str = Field(examples=["Mumbai"])
+    manager: str = Field(examples=["Jane Doe"])
+    start_date: str = Field(examples=["2022-03-14"])
+    status: str = Field(examples=["Active"])
+    access_role: Optional[str] = Field(default=None, examples=["employee"])
+    job_title: Optional[str] = Field(default=None, examples=["Senior Software Engineer"])
 
 
 class CustomerResponse(BaseModel):
@@ -88,7 +103,7 @@ class QueryRequest(BaseModel):
 
 
 class QueryResponse(BaseModel):
-    """Simulated query execution result."""
+    """Query execution result."""
 
     query_id: str
     source_type: str
@@ -96,7 +111,6 @@ class QueryResponse(BaseModel):
     row_count: int
     rows: list[dict[str, Any]]
     executed_at: str
-    simulated: bool = True
 
 
 class TriggerWorkflowRequest(BaseModel):
@@ -115,16 +129,17 @@ class WorkflowResponse(BaseModel):
     status: str
     steps: list[str]
     triggered_at: str
-    simulated: bool = True
     context: Optional[str] = None
 
 
 class ProfileResponse(BaseModel):
     """Authenticated user profile with linked employee record."""
 
-    user_id: str
-    email: str
-    full_name: str
-    provider: str
+    user_id: str = Field(examples=["uuid"])
+    email: str = Field(examples=["palash.joshi@company.com"])
+    full_name: str = Field(examples=["Palash Joshi"])
+    provider: str = Field(examples=["local"])
     employee: Optional[EmployeeResponse] = None
-    workspace_role: str = "Workspace member"
+    workspace_role: str = Field(default="Workspace member", examples=["Employee"])
+    job_title: Optional[str] = Field(default=None, examples=["Senior Software Engineer"])
+    access_role: Optional[str] = Field(default=None, examples=["employee"])

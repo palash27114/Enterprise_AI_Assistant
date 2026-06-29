@@ -65,3 +65,13 @@ def generate_refresh_token() -> str:
 def hash_refresh_token(token: str) -> str:
     """Hash a refresh token for database storage."""
     return hashlib.sha256(token.encode()).hexdigest()
+
+
+def generate_password_reset_token() -> str:
+    """Generate a secure opaque password reset token."""
+    return secrets.token_urlsafe(48)
+
+
+def hash_password_reset_token(token: str) -> str:
+    """Hash a password reset token for database storage."""
+    return hashlib.sha256(token.encode()).hexdigest()

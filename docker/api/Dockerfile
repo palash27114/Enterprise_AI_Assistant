@@ -40,6 +40,7 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 
 COPY app/ ./app/
 COPY main.py .
+COPY db/ ./db/
 COPY docker/api/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh \

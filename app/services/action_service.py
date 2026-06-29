@@ -1,12 +1,18 @@
-"""Simulated enterprise action handlers backed by mock data."""
+"""Enterprise action handlers backed by PostgreSQL."""
 
 import logging
 import re
 import uuid
 from typing import Any
 
-from app.data import mock_data
-from app.services import ticket_service
+from app.services import (
+    customer_service,
+    employee_service,
+    query_service,
+    report_service,
+    ticket_service,
+    workflow_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +29,9 @@ def execute(action: str, question: str, user_id: str | None = None, user: Any | 
     handlers = {
         "create_ticket": lambda: create_ticket(issue=question, user_id=user_id),
         "generate_report": lambda: generate_report(report_type=_detect_report_type(question)),
-        "fetch_employee": lambda: fetch_employee(query=question),
+        "fetch_employee": lambda: fetch_employee(query=question, user=user),
         "fetch_customer": lambda: fetch_customer(query=question),
-        "query_data": lambda: query_data(question=question),
+        "query_data": lambda: query_data(question=question, user=user),
         "trigger_workflow": lambda: trigger_workflow(question=question),
     }
 
@@ -40,8 +46,7 @@ def execute(action: str, question: str, user_id: str | None = None, user: Any | 
 
 def create_ticket(issue: str, user_id: str | None = None, priority: str = "Medium") -> ActionResult:
     """Create a support ticket."""
-    ticket = ticket_service.create_ticket(issue, user_id=user_id)
-    ticket["priority"] = priority
+    ticket = ticket_service.create_ticket(issue, user_id=user_id, priority=priority)
     return {
         "response": f"Support ticket {ticket['id']} created successfully.",
         "action": "create_ticket",
@@ -52,28 +57,11 @@ def create_ticket(issue: str, user_id: str | None = None, priority: str = "Mediu
 
 
 def generate_report(report_type: str = "hr", period: str = "current_quarter") -> ActionResult:
-    """Generate a mock enterprise report."""
-    if report_type not in mock_data.REPORT_TEMPLATES:
-        report_type = "hr"
-
-    template = mock_data.REPORT_TEMPLATES[report_type]
-    report_id = f"RPT-{uuid.uuid4().hex[:8].upper()}"
-    generated_at = mock_data.utc_now_iso()
-
-    data = {
-        "report_id": report_id,
-        "title": template["title"],
-        "type": report_type,
-        "generated_at": generated_at,
-        "metrics": template["metrics"],
-        "format": "pdf",
-        "download_url": f"/mock/reports/{report_id}.pdf",
-        "period": period,
-    }
-
-    metrics = template["metrics"]
+    """Generate an enterprise report from live database metrics."""
+    data = report_service.generate_report(report_type=report_type, period=period)
+    metrics = data["metrics"]
     metric_lines = ", ".join(f"{key.replace('_', ' ')}: {value}" for key, value in metrics.items())
-    response = f"Generated {template['title']} ({report_id}). Summary — {metric_lines}."
+    response = f"Generated {data['title']} ({data['report_id']}). Summary — {metric_lines}."
 
     return {
         "response": response,
@@ -84,26 +72,27 @@ def generate_report(report_type: str = "hr", period: str = "current_quarter") ->
     }
 
 
-def list_employees() -> list[dict[str, Any]]:
-    """Return all mock employees."""
-    return list(mock_data.EMPLOYEES)
+def list_employees(user: Any, search: str | None = None) -> list[dict[str, Any]]:
+    """Return employees visible to the signed-in user."""
+    return employee_service.list_visible_employees(user, search=search)
 
 
-def get_employee(employee_id: str) -> dict[str, Any] | None:
-    """Return one employee by ID."""
-    normalized = employee_id.upper()
-    for employee in mock_data.EMPLOYEES:
-        if employee["employee_id"].upper() == normalized:
-            return employee
-    return None
+def get_employee(employee_id: str, user: Any | None = None) -> dict[str, Any] | None:
+    """Return one employee by ID if visible to the user."""
+    record = employee_service.get_employee_record(employee_id)
+    if not record:
+        return None
+    if user is not None and not employee_service.can_view_employee(user, employee_id):
+        return None
+    return record
 
 
-def fetch_employee(query: str | None = None, employee_id: str | None = None) -> ActionResult:
+def fetch_employee(query: str | None = None, employee_id: str | None = None, user: Any | None = None) -> ActionResult:
     """Look up an employee by ID or search query."""
-    employee = get_employee(employee_id) if employee_id else _find_employee(query or "")
+    employee = get_employee(employee_id, user=user) if employee_id else _find_employee(query or "", user=user)
     if not employee:
         return {
-            "response": "No matching employee found. Try Palash Joshi or employee ID EMP-1001.",
+            "response": "No matching employee found in your visible directory.",
             "action": "fetch_employee",
             "ticket_id": None,
             "status": "Not Found",
@@ -123,18 +112,14 @@ def fetch_employee(query: str | None = None, employee_id: str | None = None) -> 
     }
 
 
-def list_customers() -> list[dict[str, Any]]:
-    """Return all mock customers."""
-    return list(mock_data.CUSTOMERS)
+def list_customers(search: str | None = None) -> list[dict[str, Any]]:
+    """Return customer accounts from the database."""
+    return customer_service.list_customers(search=search)
 
 
 def get_customer(customer_id: str) -> dict[str, Any] | None:
     """Return one customer by ID."""
-    normalized = customer_id.upper()
-    for customer in mock_data.CUSTOMERS:
-        if customer["customer_id"].upper() == normalized:
-            return customer
-    return None
+    return customer_service.get_customer_record(customer_id)
 
 
 def fetch_customer(query: str | None = None, customer_id: str | None = None) -> ActionResult:
@@ -167,29 +152,22 @@ def query_data(
     source_name: str | None = None,
     question: str | None = None,
     limit: int = 10,
+    user: Any | None = None,
 ) -> ActionResult:
-    """Run a simulated database or file query."""
-    if source_type and source_name:
-        rows = _rows_for_source(source_type, source_name)
-        resolved_type = source_type
-        resolved_name = source_name
-    else:
-        resolved_type, resolved_name, rows = _resolve_query_target(question or "")
-
+    """Query enterprise data stored in PostgreSQL."""
+    result = query_service.run_query(
+        user=user,
+        source_type=source_type,
+        source_name=source_name,
+        question=question,
+        limit=limit,
+    )
     query_id = f"QRY-{uuid.uuid4().hex[:8].upper()}"
-    data = {
-        "query_id": query_id,
-        "source_type": resolved_type,
-        "source_name": resolved_name,
-        "row_count": len(rows),
-        "rows": rows[:limit],
-        "executed_at": mock_data.utc_now_iso(),
-        "simulated": True,
-    }
+    data = {"query_id": query_id, **result}
 
     response = (
-        f"Query {query_id} executed against {resolved_type} `{resolved_name}`. "
-        f"Returned {len(rows)} record(s)."
+        f"Query {query_id} executed against {result['source_type']} `{result['source_name']}`. "
+        f"Returned {result['row_count']} record(s)."
     )
     return {
         "response": response,
@@ -202,35 +180,30 @@ def query_data(
 
 def list_workflows() -> list[dict[str, Any]]:
     """Return available workflow definitions."""
-    return [
-        {"workflow_key": key, "name": value["name"], "steps": value["steps"]}
-        for key, value in mock_data.WORKFLOW_DEFINITIONS.items()
-    ]
+    return workflow_service.list_workflow_definitions()
 
 
 def trigger_workflow(workflow_key: str | None = None, question: str | None = None, context: str | None = None) -> ActionResult:
-    """Trigger a simulated workflow."""
+    """Trigger a workflow and persist the execution."""
     resolved_key = workflow_key or _detect_workflow(question or "")
-    if resolved_key not in mock_data.WORKFLOW_DEFINITIONS:
+    definition = workflow_service.get_workflow_definition(resolved_key)
+    if not definition:
         resolved_key = "onboarding"
+        definition = workflow_service.get_workflow_definition(resolved_key)
 
-    workflow = mock_data.WORKFLOW_DEFINITIONS[resolved_key]
-    workflow_id = f"WF-{uuid.uuid4().hex[:8].upper()}"
+    if not definition:
+        return {
+            "response": "No workflows are configured.",
+            "action": "trigger_workflow",
+            "ticket_id": None,
+            "status": "Failed",
+            "data": {},
+        }
 
-    data = {
-        "workflow_id": workflow_id,
-        "workflow_key": resolved_key,
-        "name": workflow["name"],
-        "status": "Triggered",
-        "steps": workflow["steps"],
-        "triggered_at": mock_data.utc_now_iso(),
-        "simulated": True,
-        "context": context,
-    }
-
+    data = workflow_service.trigger_workflow(resolved_key, context=context)
     response = (
-        f"Workflow {workflow['name']} triggered ({workflow_id}). "
-        f"Status: Queued — {len(workflow['steps'])} steps scheduled."
+        f"Workflow {data['name']} triggered ({data['workflow_id']}). "
+        f"Status: Queued — {len(data['steps'])} steps scheduled."
     )
     return {
         "response": response,
@@ -242,21 +215,24 @@ def trigger_workflow(workflow_key: str | None = None, question: str | None = Non
 
 
 def get_profile(user: Any) -> ActionResult:
-    """Return the authenticated user's profile with a linked mock employee record."""
-    employee = _find_employee_by_user(user)
+    """Return the authenticated user's profile with a linked employee record."""
+    employee = employee_service.get_employee_for_user(user)
+    access_role = employee["access_role"] if employee else None
     data = {
         "user_id": user.id,
         "email": user.email,
         "full_name": user.full_name,
         "provider": user.provider,
-        "workspace_role": "Workspace member",
+        "workspace_role": employee_service.get_access_role_label(access_role or ""),
+        "job_title": employee["job_title"] if employee else None,
+        "access_role": access_role,
         "employee": employee,
     }
 
     if employee:
         response = (
             f"Your name is {user.full_name}. "
-            f"You are a {employee['role']} in the {employee['department']} department "
+            f"You are a {employee['job_title']} in the {employee['department']} department "
             f"({employee['employee_id']}, {employee['location']}). "
             f"Email: {user.email}."
         )
@@ -274,15 +250,24 @@ def get_profile(user: Any) -> ActionResult:
     }
 
 
-def _find_employee_by_user(user: Any) -> dict[str, Any] | None:
-    email = user.email.lower()
-    name = user.full_name.lower()
-    for employee in mock_data.EMPLOYEES:
-        if employee["email"].lower() == email or employee["name"].lower() == name:
+def _find_employee(query: str, user: Any | None = None) -> dict[str, Any] | None:
+    lowered = query.lower()
+    visible = employee_service.list_visible_employees(user) if user else employee_service.list_all_employees()
+
+    id_match = re.search(r"\bemp-\d+\b", lowered)
+    if id_match:
+        employee_id = id_match.group(0).upper()
+        return next((e for e in visible if e["employee_id"].upper() == employee_id), None)
+
+    for employee in visible:
+        if employee["name"].lower() in lowered:
             return employee
-    for employee in mock_data.EMPLOYEES:
-        if employee["name"].split()[0].lower() in name:
+
+    for employee in visible:
+        token = employee["name"].split()[0].lower()
+        if token in lowered.split():
             return employee
+
     return None
 
 
@@ -310,25 +295,6 @@ def _detect_workflow(question: str) -> str:
     return "onboarding"
 
 
-def _find_employee(question: str) -> dict[str, Any] | None:
-    lowered = question.lower()
-
-    id_match = re.search(r"\bemp-\d+\b", lowered)
-    if id_match:
-        return get_employee(id_match.group(0))
-
-    for employee in mock_data.EMPLOYEES:
-        if employee["name"].lower() in lowered:
-            return employee
-
-    for employee in mock_data.EMPLOYEES:
-        first_name = employee["name"].split()[0].lower()
-        if first_name in lowered.split():
-            return employee
-
-    return mock_data.EMPLOYEES[0] if question.strip() else None
-
-
 def _find_customer(question: str) -> dict[str, Any] | None:
     lowered = question.lower()
 
@@ -336,41 +302,14 @@ def _find_customer(question: str) -> dict[str, Any] | None:
     if id_match:
         return get_customer(id_match.group(0))
 
-    for customer in mock_data.CUSTOMERS:
+    customers = customer_service.list_customers()
+    for customer in customers:
         if customer["name"].lower() in lowered:
             return customer
 
-    for customer in mock_data.CUSTOMERS:
+    for customer in customers:
         token = customer["name"].split()[0].lower()
         if token in lowered.split():
             return customer
 
-    return mock_data.CUSTOMERS[0] if question.strip() else None
-
-
-def _rows_for_source(source_type: str, source_name: str) -> list[dict[str, Any]]:
-    if source_type == "file":
-        return list(mock_data.FILE_SOURCES.get(source_name, []))
-    return list(mock_data.DATABASE_TABLES.get(source_name, []))
-
-
-def _resolve_query_target(question: str) -> tuple[str, str, list[dict[str, Any]]]:
-    lowered = question.lower()
-
-    for filename, rows in mock_data.FILE_SOURCES.items():
-        if filename.replace(".csv", "") in lowered or filename in lowered:
-            return "file", filename, rows
-
-    if "leave" in lowered:
-        return "database", "leave_requests", mock_data.DATABASE_TABLES["leave_requests"]
-    if "ticket" in lowered or "incident" in lowered:
-        return "database", "tickets", mock_data.DATABASE_TABLES["tickets"]
-    if "customer" in lowered or "client" in lowered:
-        return "database", "customers", mock_data.DATABASE_TABLES["customers"]
-    if "employee" in lowered or "staff" in lowered:
-        return "database", "employees", mock_data.DATABASE_TABLES["employees"]
-
-    if "file" in lowered or "csv" in lowered:
-        return "file", "employees.csv", mock_data.FILE_SOURCES["employees.csv"]
-
-    return "database", "employees", mock_data.DATABASE_TABLES["employees"]
+    return None

@@ -200,10 +200,49 @@ class LogoutRequest(BaseModel):
 class UserResponse(BaseModel):
     """Authenticated user profile."""
 
-    id: str
-    email: str
-    full_name: str
-    provider: str
+    id: str = Field(examples=["uuid"])
+    email: str = Field(examples=["palash.joshi@company.com"])
+    full_name: str = Field(examples=["Palash Joshi"])
+    provider: str = Field(examples=["local"])
+    employee_id: Optional[str] = Field(default=None, examples=["EMP-1001"])
+    job_title: Optional[str] = Field(default=None, examples=["Senior Software Engineer"])
+    access_role: Optional[str] = Field(default=None, examples=["employee"])
+    access_role_label: Optional[str] = Field(default=None, examples=["Employee"])
+
+
+class ChangePasswordRequest(BaseModel):
+    """Payload for POST /auth/change-password."""
+
+    current_password: str = Field(..., min_length=8, max_length=128, examples=["oldpassword123"])
+    new_password: str = Field(..., min_length=8, max_length=128, examples=["newpassword456"])
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Payload for POST /auth/forgot-password."""
+
+    email: str = Field(..., examples=["palash.joshi@company.com"])
+
+
+class ResetPasswordRequest(BaseModel):
+    """Payload for POST /auth/reset-password."""
+
+    token: str = Field(..., min_length=20, examples=["reset-token-from-email-link"])
+    new_password: str = Field(..., min_length=8, max_length=128, examples=["newpassword456"])
+
+
+class ForgotPasswordResponse(BaseModel):
+    """Response for password reset request."""
+
+    message: str = Field(
+        examples=[
+            "If an account exists for that email, password reset instructions have been sent.",
+        ],
+    )
+    reset_url: Optional[str] = Field(
+        default=None,
+        description="Dev-only reset link when EXPOSE_PASSWORD_RESET_URL is enabled.",
+        examples=["http://localhost:5173/reset-password?token=example"],
+    )
 
 
 class TokenResponse(BaseModel):

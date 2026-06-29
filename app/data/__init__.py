@@ -1,1 +1,1 @@
-"""Mock data package."""
+"""Static application data assets."""

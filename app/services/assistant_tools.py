@@ -119,8 +119,8 @@ OPENAI_TOOLS: list[dict[str, Any]] = [
         "function": {
             "name": "query_enterprise_data",
             "description": (
-                "Run a query against mock company database tables or CSV files. "
-                "Use when the user wants to query/search database records or read a data file."
+                "Run a query against company database tables (employees, customers, tickets, leave, policies). "
+                "Use when the user wants to query or search enterprise records."
             ),
             "parameters": {
                 "type": "object",
@@ -196,7 +196,7 @@ def execute_tool(
     if tool_name == "lookup_employee":
         query = arguments.get("query") or fallback_question
         employee_id = arguments.get("employee_id")
-        return action_service.fetch_employee(query=query, employee_id=employee_id)
+        return action_service.fetch_employee(query=query, employee_id=employee_id, user=user)
 
     if tool_name == "lookup_customer":
         query = arguments.get("query") or fallback_question
@@ -210,8 +210,9 @@ def execute_tool(
             return action_service.query_data(
                 source_type=source_type,
                 source_name=source_name,
+                user=user,
             )
-        return action_service.query_data(question=fallback_question)
+        return action_service.query_data(question=fallback_question, user=user)
 
     if tool_name == "trigger_workflow":
         return action_service.trigger_workflow(

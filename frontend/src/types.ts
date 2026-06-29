@@ -32,6 +32,19 @@ export interface AuthUser {
   email: string;
   full_name: string;
   provider: string;
+  employee_id?: string | null;
+  job_title?: string | null;
+  access_role?: string | null;
+  access_role_label?: string | null;
+}
+
+export interface TicketRecord {
+  id: string;
+  issue: string;
+  status: string;
+  priority?: string | null;
+  created_at: string;
+  updated_at?: string | null;
 }
 
 export interface AuthTokens {

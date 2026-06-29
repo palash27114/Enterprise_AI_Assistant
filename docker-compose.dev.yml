@@ -54,12 +54,14 @@ services:
       APP_RELOAD: "true"
       APP_WORKERS: 1
       LOG_LEVEL: DEBUG
+      EXPOSE_PASSWORD_RESET_URL: "true"
     depends_on:
       postgres:
         condition: service_healthy
     volumes:
       - ./app:/app/app
       - ./main.py:/app/main.py
+      - ./db:/app/db
     ports:
       - "${API_PORT:-8000}:8000"
     entrypoint: []

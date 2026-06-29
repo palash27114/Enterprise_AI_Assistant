@@ -39,6 +39,11 @@ docker-up:
 docker-dev:
 	docker compose -f docker-compose.dev.yml up --build
 
+docker-reset-db:
+	docker compose -f docker-compose.dev.yml down -v
+	docker compose down -v 2>/dev/null || true
+	@echo "Database volumes removed. Run 'make docker-dev' to start fresh."
+
 docker-down:
 	docker compose down
 	docker compose -f docker-compose.dev.yml down 2>/dev/null || true
